@@ -1,11 +1,14 @@
+import java.util.HashSet;
 public class TxHandler {
 
+	private UTXOPool currentLedger;
 	/* Creates a public ledger whose current UTXOPool (collection of unspent 
 	 * transaction outputs) is utxoPool. This should make a defensive copy of 
 	 * utxoPool by using the UTXOPool(UTXOPool uPool) constructor.
 	 */
 	public TxHandler(UTXOPool utxoPool) {
 		// IMPLEMENT THIS
+		currentLedger = new UTXOPool(utxoPool);
 	}
 
 	/* Returns true if 
@@ -20,7 +23,25 @@ public class TxHandler {
 
 	public boolean isValidTx(Transaction tx) {
 		// IMPLEMENT THIS
-		return false;
+		HashSet <UTXO> currentPool = new HashSet<>();
+		
+		for(int i = 0; i < tx.numInputs(); i++){
+			Transaction.Input input = tx.getInput(i);
+			UTXO utxo = new UTXO(input.prevTxHash, input.outputIndex);
+
+			if (currentLedger.contains(utxo) == false ){
+				return false;
+			}
+
+			if (currentPool.contains(utxo)){
+				return false;
+			}
+			currentPool.add(utxo);
+
+
+		}
+
+		return true;
 	}
 
 	/* Handles each epoch by receiving an unordered array of proposed 
