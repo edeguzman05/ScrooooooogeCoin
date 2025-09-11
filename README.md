@@ -1,0 +1,2 @@
+# ScrooooooogeCoin
+Le Scroogecoin fun
