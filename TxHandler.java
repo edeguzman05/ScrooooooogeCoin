@@ -1,3 +1,4 @@
+import java.util.ArrayList;
 import java.util.HashSet;
 public class TxHandler {
 
@@ -24,21 +25,32 @@ public class TxHandler {
 	public boolean isValidTx(Transaction tx) {
 		// IMPLEMENT THIS
 		HashSet <UTXO> currentPool = new HashSet<>();
-		
-		for(int i = 0; i < tx.numInputs(); i++){
-			Transaction.Input input = tx.getInput(i);
-			UTXO utxo = new UTXO(input.prevTxHash, input.outputIndex);
+		ArrayList<Transaction.Output> txOutputs = tx.getOutputs();
+		ArrayList<Transaction.Input> txInputs = tx.getInputs();
 
-			if (currentLedger.contains(utxo) == false ){
+		// Checking txInputs
+		for(Transaction.Input txInput : txInputs){
+			UTXO utxo = new UTXO(txInput.prevTxHash, txInput.outputIndex);
+
+			// Returns false if UTXO is not in ledger
+			if (!currentLedger.contains(utxo)){
+				// System.out.println((utxo) + " is not in the ledger!");
 				return false;
 			}
 
+			// Returns false if UTXO is in pool
 			if (currentPool.contains(utxo)){
+				// System.out.println((utxo) + " is already in the pool!");
 				return false;
 			}
 			currentPool.add(utxo);
+		}
 
-
+		// Checking txOutputs
+		for (Transaction.Output txOutput : txOutputs) {
+			if (txOutput.value < 0) {
+				return false;
+			}
 		}
 
 		return true;
