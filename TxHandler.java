@@ -40,6 +40,22 @@ public class TxHandler {
 				return false;
 			}
 
+			// Grabs the previous transactions output
+			Transaction.Output prevTxOutput = currentLedger.getTxOutput(utxo);
+
+			// Grabs the public key to check the signature
+			RSAKey publicKey = prevTxOutput.address;
+
+			// Grabs the raw data to sign and the signature
+			byte [] message = tx.getRawDataToSign(txInputs.indexOf(txInput));
+			byte [] signature = txInput.signature;
+
+			// Returns false if the signature is invalid
+			if (publicKey.verifySignature(message, signature) == false){
+				// System.out.println("Signature is invalid!");
+				return false;
+			}	
+
 			// Returns false if UTXO is in pool
 			if (currentPool.contains(utxo)){
 				// System.out.println((utxo) + " is already in the pool!");
@@ -59,7 +75,7 @@ public class TxHandler {
 			}
 			outputSum += txOutput.value;
 		}
-
+		
 		// Returns false if the sum of Input values
 		// is less than the sum of Output values
 		if (inputSum < outputSum) {
@@ -76,7 +92,16 @@ public class TxHandler {
 	 */
 	public Transaction[] handleTxs(Transaction[] possibleTxs) {
 		// IMPLEMENT THIS
-		return null;
+		//Create a new array for the approved transactions
+		ArrayList<Transaction> approvedTxo = new ArrayList<>();
+		//Loop through any possible Txs
+		for (Transaction possibleTrans : possibleTxs) {
+			if (isValidTx(possibleTrans)) {
+				approvedTxo.add(possibleTrans);
+			}
+		}
+		//Returns the approved transaction as a transaction array
+		return approvedTxo.toArray(Transaction[]::new);
 	}
 
 } 
