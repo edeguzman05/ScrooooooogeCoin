@@ -25,8 +25,10 @@ public class TxHandler {
 	public boolean isValidTx(Transaction tx) {
 		// IMPLEMENT THIS
 		HashSet <UTXO> currentPool = new HashSet<>();
-		ArrayList<Transaction.Output> txOutputs = tx.getOutputs();
 		ArrayList<Transaction.Input> txInputs = tx.getInputs();
+		ArrayList<Transaction.Output> txOutputs = tx.getOutputs();
+		double inputSum = 0;
+		double outputSum = 0;
 
 		// Checking txInputs
 		for(Transaction.Input txInput : txInputs){
@@ -43,14 +45,25 @@ public class TxHandler {
 				// System.out.println((utxo) + " is already in the pool!");
 				return false;
 			}
+
+			inputSum += currentLedger.getTxOutput(utxo).value;
 			currentPool.add(utxo);
 		}
 
 		// Checking txOutputs
 		for (Transaction.Output txOutput : txOutputs) {
+			// Returns false if txOutput is negative
 			if (txOutput.value < 0) {
+				// System.out.println((txOutput.value) + " is negative!");
 				return false;
 			}
+			outputSum += txOutput.value;
+		}
+
+		// Returns false if the sum of Input values
+		// is less than the sum of Output values
+		if (inputSum < outputSum) {
+			return false;
 		}
 
 		return true;
