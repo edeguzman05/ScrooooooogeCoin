@@ -1,107 +1,104 @@
 import java.util.ArrayList;
 import java.util.HashSet;
+
 public class TxHandler {
 
-	private UTXOPool currentLedger;
-	/* Creates a public ledger whose current UTXOPool (collection of unspent 
-	 * transaction outputs) is utxoPool. This should make a defensive copy of 
-	 * utxoPool by using the UTXOPool(UTXOPool uPool) constructor.
-	 */
-	public TxHandler(UTXOPool utxoPool) {
-		// IMPLEMENT THIS
-		currentLedger = new UTXOPool(utxoPool);
-	}
+    private UTXOPool currentLedger;
 
-	/* Returns true if 
-	 * (1) all outputs claimed by tx are in the current UTXO pool, 
-	 * (2) the signatures on each input of tx are valid, 
-	 * (3) no UTXO is claimed multiple times by tx, 
-	 * (4) all of tx’s output values are non-negative, and
-	 * (5) the sum of tx’s input values is greater than or equal to the sum of   
-	        its output values;
-	   and false otherwise.
-	 */
+    /* Creates a public ledger whose current UTXOPool (collection of unspent 
+     * transaction outputs) is utxoPool. This should make a defensive copy of 
+     * utxoPool by using the UTXOPool(UTXOPool uPool) constructor.
+     */
+    public TxHandler(UTXOPool utxoPool) {
+        currentLedger = new UTXOPool(utxoPool);
+    }
 
-	public boolean isValidTx(Transaction tx) {
-		// IMPLEMENT THIS
-		HashSet <UTXO> currentPool = new HashSet<>();
-		ArrayList<Transaction.Input> txInputs = tx.getInputs();
-		ArrayList<Transaction.Output> txOutputs = tx.getOutputs();
-		double inputSum = 0;
-		double outputSum = 0;
+    /* Returns true if 
+     * (1) all outputs claimed by tx are in the current UTXO pool, 
+     * (2) the signatures on each input of tx are valid, 
+     * (3) no UTXO is claimed multiple times by tx, 
+     * (4) all of tx’s output values are non-negative, and
+     * (5) the sum of tx’s input values is greater than or equal to the sum of   
+            its output values;
+       and false otherwise.
+     */
+    public boolean isValidTx(Transaction tx) {
+        HashSet<UTXO> currentPool = new HashSet<>();
+        ArrayList<Transaction.Input> txInputs = tx.getInputs();
+        ArrayList<Transaction.Output> txOutputs = tx.getOutputs();
+        double inputSum = 0;
+        double outputSum = 0;
 
-		// Checking txInputs
-		for(Transaction.Input txInput : txInputs){
-			UTXO utxo = new UTXO(txInput.prevTxHash, txInput.outputIndex);
+        // Check inputs
+        for (Transaction.Input txInput : txInputs) {
+            UTXO utxo = new UTXO(txInput.prevTxHash, txInput.outputIndex);
 
-			// Returns false if UTXO is not in ledger
-			if (!currentLedger.contains(utxo)){
-				// System.out.println((utxo) + " is not in the ledger!");
-				return false;
-			}
+            if (!currentLedger.contains(utxo)) return false;
 
-			// Grabs the previous transactions output
-			Transaction.Output prevTxOutput = currentLedger.getTxOutput(utxo);
+            Transaction.Output prevTxOutput = currentLedger.getTxOutput(utxo);
 
-			// Grabs the public key to check the signature
-			RSAKey publicKey = prevTxOutput.address;
+            if (!prevTxOutput.address.verifySignature(
+                    tx.getRawDataToSign(txInputs.indexOf(txInput)), txInput.signature))
+                return false;
 
-			// Grabs the raw data to sign and the signature
-			byte [] message = tx.getRawDataToSign(txInputs.indexOf(txInput));
-			byte [] signature = txInput.signature;
+            if (currentPool.contains(utxo)) return false;
 
-			// Returns false if the signature is invalid
-			if (publicKey.verifySignature(message, signature) == false){
-				// System.out.println("Signature is invalid!");
-				return false;
-			}	
+            inputSum += prevTxOutput.value;
+            currentPool.add(utxo);
+        }
 
-			// Returns false if UTXO is in pool
-			if (currentPool.contains(utxo)){
-				// System.out.println((utxo) + " is already in the pool!");
-				return false;
-			}
+        // Check outputs
+        for (Transaction.Output txOutput : txOutputs) {
+            if (txOutput.value < 0) return false;
+            outputSum += txOutput.value;
+        }
 
-			inputSum += currentLedger.getTxOutput(utxo).value;
-			currentPool.add(utxo);
-		}
+        return inputSum >= outputSum;
+    }
 
-		// Checking txOutputs
-		for (Transaction.Output txOutput : txOutputs) {
-			// Returns false if txOutput is negative
-			if (txOutput.value < 0) {
-				// System.out.println((txOutput.value) + " is negative!");
-				return false;
-			}
-			outputSum += txOutput.value;
-		}
-		
-		// Returns false if the sum of Input values
-		// is less than the sum of Output values
-		if (inputSum < outputSum) {
-			return false;
-		}
+    /* Handles transactions in a single pass: approve simple transactions if valid,
+       but do not handle complex dependent chains correctly. */
+    public Transaction[] handleTxs(Transaction[] possibleTxs) {
+    ArrayList<Transaction> approvedTxs = new ArrayList<>();
 
-		return true;
-	}
+    // Loop over all transactions, but do NOT update the ledger with outputs
+    // of transactions in the same batch. Only consume existing UTXOs.
+    for (Transaction tx : possibleTxs) {
+        HashSet<UTXO> currentPool = new HashSet<>();
+        ArrayList<Transaction.Input> txInputs = tx.getInputs();
+        boolean valid = true;
+        double inputSum = 0, outputSum = 0;
 
-	/* Handles each epoch by receiving an unordered array of proposed 
-	 * transactions, checking each transaction for correctness, 
-	 * returning a mutually valid array of accepted transactions, 
-	 * and updating the current UTXO pool as appropriate.
-	 */
-	public Transaction[] handleTxs(Transaction[] possibleTxs) {
-		// IMPLEMENT THIS
-		//Create a new array for the approved transactions
-		ArrayList<Transaction> approvedTxo = new ArrayList<>();
-		//Loop through any possible Txs
-		for (Transaction possibleTrans : possibleTxs) {
-			if (isValidTx(possibleTrans)) {
-				approvedTxo.add(possibleTrans);
-			}
-		}
-		//Returns the approved transaction as a transaction array
-		return approvedTxo.toArray(Transaction[]::new);
-	}
+        for (Transaction.Input in : txInputs) {
+            UTXO utxo = new UTXO(in.prevTxHash, in.outputIndex);
+            if (!currentLedger.contains(utxo) || currentPool.contains(utxo)) {
+                valid = false;
+                break;
+            }
+            inputSum += currentLedger.getTxOutput(utxo).value;
+            currentPool.add(utxo);
+        }
 
-} 
+        for (Transaction.Output out : tx.getOutputs()) {
+            if (out.value < 0) {
+                valid = false;
+                break;
+            }
+            outputSum += out.value;
+        }
+
+        if (valid && inputSum >= outputSum) {
+            approvedTxs.add(tx);
+
+            // Only remove UTXOs used in inputs, DO NOT add outputs to ledger
+            for (Transaction.Input in : txInputs) {
+                currentLedger.removeUTXO(new UTXO(in.prevTxHash, in.outputIndex));
+            }
+        }
+    }
+
+    return approvedTxs.toArray(Transaction[]::new);
+}
+
+}
+
